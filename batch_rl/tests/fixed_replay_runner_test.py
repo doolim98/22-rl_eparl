@@ -37,8 +37,7 @@ class FixedReplayRunnerIntegrationTest(tf.test.TestCase):
   def setUp(self):
     super(FixedReplayRunnerIntegrationTest, self).setUp()
     FLAGS.base_dir = os.path.join(
-        # '/tmp/batch_rl_tests',
-        '/root/out/batch_rl_tests',
+        '/tmp/batch_rl_tests',
         datetime.datetime.utcnow().strftime('run_%Y_%m_%d_%H_%M_%S'))
     self._checkpoint_dir = os.path.join(FLAGS.base_dir, 'checkpoints')
     self._logging_dir = os.path.join(FLAGS.base_dir, 'logs')

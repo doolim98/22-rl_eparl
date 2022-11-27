@@ -21,13 +21,13 @@ from __future__ import print_function
 
 import collections
 from concurrent import futures
+# from dopamine.replay_memory import circular_replay_buffer
+from batch_rl.fixed_replay.replay_memory import circular_replay_buffer
 
-from absl import logging
-from dopamine.replay_memory import circular_replay_buffer
-import gin
 import numpy as np
 import tensorflow.compat.v1 as tf
 
+import gin
 gfile = tf.gfile
 
 STORE_FILENAME_PREFIX = circular_replay_buffer.STORE_FILENAME_PREFIX
@@ -36,34 +36,23 @@ STORE_FILENAME_PREFIX = circular_replay_buffer.STORE_FILENAME_PREFIX
 class FixedReplayBuffer(object):
   """Object composed of a list of OutofGraphReplayBuffers."""
 
-  def __init__(self,
-               data_dir,
-               replay_suffix,
-               *args,
-               replay_file_start_index=0,
-               replay_file_end_index=None,
-               **kwargs):  # pylint: disable=keyword-arg-before-vararg
+  def __init__(self, data_dir, replay_suffix, ckpt_chooser=None, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg
     """Initialize the FixedReplayBuffer class.
 
     Args:
       data_dir: str, log Directory from which to load the replay buffer.
-
       replay_suffix: int, If not None, then only load the replay buffer
         corresponding to the specific suffix in data directory.
       *args: Arbitrary extra arguments.
-      replay_file_start_index: int, Starting index of the replay buffer to use.
-      replay_file_end_index: int, End index of the replay buffer to use.
       **kwargs: Arbitrary keyword arguments.
     """
+    self.ckpt_chooser = ckpt_chooser
     self._args = args
     self._kwargs = kwargs
     self._data_dir = data_dir
     self._loaded_buffers = False
     self.add_count = np.array(0)
     self._replay_suffix = replay_suffix
-    # TODO: Change this line to specific suffixes
-    self._replay_indices = self._get_checkpoint_suffixes(
-        replay_file_start_index, replay_file_end_index)
     while not self._loaded_buffers:
       if replay_suffix:
         assert replay_suffix >= 0, 'Please pass a non-negative replay suffix'
@@ -84,54 +73,33 @@ class FixedReplayBuffer(object):
     """Loads a OutOfGraphReplayBuffer replay buffer."""
     try:
       # pytype: disable=attribute-error
-      logging.info(
-          'Starting to load from ckpt %s from %s', suffix, self._data_dir)
       replay_buffer = circular_replay_buffer.OutOfGraphReplayBuffer(
           *self._args, **self._kwargs)
       replay_buffer.load(self._data_dir, suffix)
-      # pylint:disable=protected-access
-      replay_capacity = replay_buffer._replay_capacity
-      logging.info('Capacity: %d', replay_buffer._replay_capacity)
-      for name, array in replay_buffer._store.items():
-        # This frees unused RAM if replay_capacity is smaller than 1M
-        replay_buffer._store[name] = array[:replay_capacity + 4].copy()
-        logging.info('%s: %s', name, array.shape)
-      logging.info('Loaded replay buffer ckpt %s from %s',
-                   suffix, self._data_dir)
-      # pylint:enable=protected-access
+      tf.logging.info('Loaded replay buffer ckpt {} from {}'.format(
+          suffix, self._data_dir))
       # pytype: enable=attribute-error
       return replay_buffer
     except tf.errors.NotFoundError:
       return None
 
-  def _get_checkpoint_suffixes(self, replay_file_start_index,
-                               replay_file_end_index):
-    """Get replay buffer indices to be be sampled among all replay buffers."""
-    ckpts = gfile.ListDirectory(self._data_dir)  # pytype: disable=attribute-error
-    # Assumes that the checkpoints are saved in a format CKPT_NAME.{SUFFIX}.gz
-    ckpt_counters = collections.Counter(
-        [name.split('.')[-2] for name in ckpts if name.endswith('gz')])
-    # Should contain the files for add_count, action, observation, reward,
-    # terminal and invalid_range
-    ckpt_suffixes = [
-        int(x) for x in ckpt_counters if ckpt_counters[x] in [6, 7]]
-    # Sort the replay buffer indices. This would correspond to list of indices
-    # ranging from [0, 1, 2, ..]
-    ckpt_suffixes = sorted(ckpt_suffixes)
-    if replay_file_end_index is None:
-      replay_file_end_index = len(ckpt_suffixes)
-    replay_indices = ckpt_suffixes[
-        replay_file_start_index:replay_file_end_index]
-    logging.info('Replay indices: %s', str(replay_indices))
-    if len(replay_indices) == 1:
-      self._replay_suffix = replay_indices[0]
-    return replay_indices
-
-  def _load_replay_buffers(self, num_buffers):
+  def _load_replay_buffers(self, num_buffers=None):
     """Loads multiple checkpoints into a list of replay buffers."""
     if not self._loaded_buffers:  # pytype: disable=attribute-error
-      ckpt_suffixes = np.random.choice(
-          self._replay_indices, num_buffers, replace=False)
+      ckpts = gfile.ListDirectory(self._data_dir)  # pytype: disable=attribute-error
+      # Assumes that the checkpoints are saved in a format CKPT_NAME.{SUFFIX}.gz
+      ckpt_counters = collections.Counter(
+          [name.split('.')[-2] for name in ckpts])
+      # Should contain the files for add_count, action, observation, reward,
+      # terminal and invalid_range
+      ckpt_suffixes = [x for x in ckpt_counters if ckpt_counters[x] in [6, 7]]
+      if self.ckpt_chooser is not None:
+          ckpt_suffixes = self.ckpt_chooser(ckpt_suffixes)
+      tf.logging.info(f'ckpt_suffixes {ckpt_suffixes}')
+      assert num_buffers is not None
+      if num_buffers is not None:
+        ckpt_suffixes = np.random.choice(
+            ckpt_suffixes, num_buffers, replace=False)
       self._replay_buffers = []
       # Load the replay buffers in parallel
       with futures.ThreadPoolExecutor(
@@ -158,10 +126,9 @@ class FixedReplayBuffer(object):
   def load(self, *args, **kwargs):  # pylint: disable=unused-argument
     pass
 
-  def reload_buffer(self, num_buffers):
-    if not self._replay_suffix:
-      self._loaded_buffers = False
-      self._load_replay_buffers(num_buffers)
+  def reload_bffer(self, num_buffers=None):
+    self._loaded_buffers = False
+    self._load_replay_buffers(num_buffers)
 
   def save(self, *args, **kwargs):  # pylint: disable=unused-argument
     pass
@@ -170,8 +137,8 @@ class FixedReplayBuffer(object):
     pass
 
 
-@gin.configurable(
-    denylist=['observation_shape', 'stack_size', 'update_horizon', 'gamma'])
+@gin.configurable(denylist=['observation_shape', 'stack_size',
+                             'update_horizon', 'gamma'])
 class WrappedFixedReplayBuffer(circular_replay_buffer.WrappedReplayBuffer):
   """Wrapper of OutOfGraphReplayBuffer with an in graph sampling mechanism."""
 
@@ -180,6 +147,7 @@ class WrappedFixedReplayBuffer(circular_replay_buffer.WrappedReplayBuffer):
                replay_suffix,
                observation_shape,
                stack_size,
+               ckpt_chooser=None,
                use_staging=True,
                replay_capacity=1000000,
                batch_size=32,
@@ -196,7 +164,7 @@ class WrappedFixedReplayBuffer(circular_replay_buffer.WrappedReplayBuffer):
     """Initializes WrappedFixedReplayBuffer."""
 
     memory = FixedReplayBuffer(
-        data_dir, replay_suffix, observation_shape, stack_size, replay_capacity,
+        data_dir, replay_suffix, ckpt_chooser, observation_shape, stack_size, replay_capacity,
         batch_size, update_horizon, gamma, max_sample_attempts,
         extra_storage_types=extra_storage_types,
         observation_dtype=observation_dtype)
