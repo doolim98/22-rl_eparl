@@ -1,15 +1,12 @@
-# COPA
+# 22-RL EPARL
 ## Setup
 ```sh
 $ docker/build.sh
 $ docker/run.sh
 # in docker 
-$ download.sh
-```
-
-## Data partitioning
-```sh
-$ ./split_script.sh Breakout
+$ ./download.sh
+$ ./demo_train.sh
+$ ./demo_test.sh
 ```
 
 # Origianl README
