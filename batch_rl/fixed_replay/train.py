@@ -40,7 +40,8 @@ import tensorflow.compat.v1 as tf
 
 # from dopamine.google import xm_utils
 
-flags.DEFINE_integer('part_size',50,'total partition num')
+flags.DEFINE_integer('part_size', 50,'total partition num')
+flags.DEFINE_integer('eparl_size', 50,'eparl partition num')
 flags.DEFINE_integer('part_id', None,'partition id')
 flags.DEFINE_string('agent_name', 'dqn', 'Name of the agent.')
 flags.DEFINE_string('base_dir', None,
@@ -86,8 +87,49 @@ def create_agent(sess, environment, replay_data_dir, summary_writer=None):
     raise ValueError('{} is not a valid agent name'.format(FLAGS.agent_name))
 
   def ckpt_chooser(ckpts):
-    print("part chooser: ", FLAGS.part_size, FLAGS.part_id)
-    ckpts= [x for x in ckpts if x%FLAGS.part_size==FLAGS.part_id]
+    psz = int(FLAGS.part_size)
+    epsz = int(FLAGS.eparl_size)
+    pid = int(FLAGS.part_id)
+    print(f"EPARL: part chooser: psz:{psz}, epsz:{epsz}, pid:{pid}")
+    assert pid < epsz
+    if psz == epsz:
+      print("normal partition")
+      ckpts = [x for x in ckpts if int(x) %
+              psz == pid]
+    else:
+      print("eparl partition")
+      p_ckpts = []
+      d_ckpts = []
+      for x in ckpts:
+        if int(x) % psz == pid:
+          p_ckpts += [x]
+        elif int(x) % psz >= epsz:
+          d_ckpts += [x]
+      d_csz = len(d_ckpts)//epsz
+      d_idx = d_csz*pid
+      print(f"EPARL: d_csz:{d_csz}, d_idx:{d_idx}, d_ckpts:{d_ckpts}")
+      d_ckpts = d_ckpts[d_idx:d_idx+d_csz]
+      ckpts = p_ckpts + d_ckpts
+    """
+    [1,2,3,4,5,6,7,8]
+    [1,5][2,6][3,7][4,8]
+
+    s: atomic set size
+    p: preserved set num
+    d: distributed set num
+    total = s*p + s*d
+    poison in preserved: Kp < p
+    poison in distributed: Kd < d
+
+    (Kp+Kd)/(p+d)
+    
+    > after parition
+    partition num: p
+    max poision: Kp+Kd
+    (Kp+Kd)/p
+
+    """
+
     print(ckpts)
     return ckpts
 

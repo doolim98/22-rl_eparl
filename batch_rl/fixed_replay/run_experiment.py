@@ -71,7 +71,8 @@ class FixedReplayRunner(run_experiment.Runner):
     self._agent.eval_mode = False
     start_time = time.time()
     from tqdm import tqdm
-    for _ in tqdm(range(self._training_steps)):
+    # for _ in tqdm(range(self._training_steps)):
+    for _ in range(self._training_steps):
       self._agent._train_step()  # pylint: disable=protected-access
     time_delta = time.time() - start_time
     tf.logging.info('Average training steps per second: %.2f',

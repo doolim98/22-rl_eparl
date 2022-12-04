@@ -31,7 +31,7 @@ import tensorflow.compat.v1 as tf
 class FixedReplayQuantileAgent(quantile_agent.QuantileAgent):
   """An implementation of the DQN agent with fixed replay buffer(s)."""
 
-  def __init__(self, sess, num_actions, replay_data_dir, replay_suffix=None,
+  def __init__(self, sess, num_actions, replay_data_dir, ckpt_chooser=None, replay_suffix=None,
                init_checkpoint_dir=None, **kwargs):
     """Initializes the agent and constructs the components of its graph.
 
@@ -52,6 +52,7 @@ class FixedReplayQuantileAgent(quantile_agent.QuantileAgent):
         'Creating FixedReplayAgent with replay directory: %s', replay_data_dir)
     tf.logging.info('\t init_checkpoint_dir: %s', init_checkpoint_dir)
     tf.logging.info('\t replay_suffix %s', replay_suffix)
+    self.ckpt_chooser = ckpt_chooser
     self._replay_data_dir = replay_data_dir
     self._replay_suffix = replay_suffix
     if init_checkpoint_dir is not None:
@@ -88,6 +89,7 @@ class FixedReplayQuantileAgent(quantile_agent.QuantileAgent):
     return fixed_replay_buffer.WrappedFixedReplayBuffer(
         data_dir=self._replay_data_dir,
         replay_suffix=self._replay_suffix,
+        ckpt_chooser=self.ckpt_chooser,
         observation_shape=self.observation_shape,
         stack_size=self.stack_size,
         use_staging=use_staging,

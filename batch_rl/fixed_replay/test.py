@@ -92,8 +92,8 @@ def create_agent(sess, environment, replay_data_dir, summary_writer=None):
   else:
     raise ValueError('{} is not a valid agent name'.format(FLAGS.agent_name))
 
-  return agent(sess, num_actions=environment.action_space.n,
-               replay_data_dir=replay_data_dir, summary_writer=summary_writer,
+  return agent(sess, num_actions=environment.action_space.n, 
+               replay_data_dir=replay_data_dir, ckpt_chooser=None, summary_writer=summary_writer,
                init_checkpoint_dir=FLAGS.init_checkpoint_dir,
                eval_mode=True)
 

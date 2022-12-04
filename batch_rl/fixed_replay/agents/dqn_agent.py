@@ -32,7 +32,7 @@ import tensorflow.compat.v1 as tf
 class FixedReplayDQNAgent(dqn_agent.DQNAgent):
   """An implementation of the DQN agent with fixed replay buffer(s)."""
 
-  def __init__(self, sess, num_actions, replay_data_dir,ckpt_chooser=None,replay_suffix=None,
+  def __init__(self, sess, num_actions, replay_data_dir,ckpt_chooser,replay_suffix=None,
                init_checkpoint_dir=None, **kwargs):
     """Initializes the agent and constructs the components of its graph.
 
@@ -52,6 +52,8 @@ class FixedReplayDQNAgent(dqn_agent.DQNAgent):
     tf.logging.info('\t init_checkpoint_dir %s', init_checkpoint_dir)
     tf.logging.info('\t replay_suffix %s', replay_suffix)
     self.ckpt_chooser = ckpt_chooser
+    print('ckpt_chooser', self.ckpt_chooser)
+    print('cur name scope: ', tf.compat.v2.get_current_name_scope())
     # Set replay_log_dir before calling parent's initializer
     self._replay_data_dir = replay_data_dir
     self._replay_suffix = replay_suffix

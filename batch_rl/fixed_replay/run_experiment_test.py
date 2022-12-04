@@ -135,7 +135,12 @@ class TestRunner(object):
 
     self._environment = create_environment_fn()
 
+    # if not EAGER:
+    tf.compat.v1.disable_eager_execution()
+    # self.config = tf.compat.v1.ConfigProto(allow_soft_placement=True,log_device_placement=True)
     self.config = tf.compat.v1.ConfigProto(allow_soft_placement=True)
+    # self.config = tf.compat.v1.ConfigProto(allow_soft_placement=False)
+    # self.config = tf.compat.v1.ConfigProto()
     # Allocate only subset of the GPU memory as needed which allows for running
     # multiple agents/workers on the same GPU.
     self.config.gpu_options.allow_growth = True
@@ -209,6 +214,8 @@ class TestRunner(object):
     # self._logger.info(len(actions), unique, count)
     max_id = np.argmax(count)
     action = unique[max_id]
+    # action = actions[0]
+    # print(len(actions),action,unique,count)
 
     if len(unique) == 1:
       new_count = 1 if action else 0
@@ -299,20 +306,30 @@ class TestRunner(object):
     # evaluate for oniteration
     id_list = list(range(1, self._total_num+1))
 
+    # tf.compat.v1.reset_default_graph()
+    # tf.compat.v1.initialize_all_variables()
     sess = tf.compat.v1.Session('', config=self.config)
+    # print('SESSION', len(sess.graph._nodes_by_name.keys()))
     sess.run(tf.compat.v1.global_variables_initializer())
+    # print('SESSION', sess.graph._nodes_by_name.keys())
 
     t_0 = time.time()
     self._agents = []
+    saver_map={}
     for cur_id in id_list:
-      with tf.name_scope(f"net{cur_id}"):
+      netid=f"net{cur_id}"
+      with tf.name_scope(netid):
+      # with tf1.variable_scope(netid,reuse=True):
         agent = self.create_agent_fn(sess, self._environment,
                                       summary_writer=None)
-      net1_varlist = {v.op.name.lstrip(f"net{cur_id}/"): v
-                    for v in tf1.get_collection(tf1.GraphKeys.VARIABLES, scope=f"net{cur_id}/")}
+      net1_varlist = {v.op.name.lstrip(f"{netid}/"): v
+                    for v in tf1.get_collection(tf1.GraphKeys.VARIABLES, scope=f"{netid}/")}
       print(net1_varlist)
       net1_saver = tf1.train.Saver(var_list=net1_varlist)
+    #   saver_map[cur_id] = net1_saver
 
+    # for cur_id in id_list:
+    #   net1_saver = saver_map[cur_id]
       t = time.time()
       net1_saver.restore(sess, f'{self._model_dir}test{cur_id}/checkpoints/tf_ckpt-49')
       self._logger.info(f'loading ckpts {cur_id} taking {time.time() - t} seconds!')
@@ -332,11 +349,11 @@ class TestRunner(object):
       step_number, total_reward, all_cert, all_obs, all_reward, all_action = self._run_one_episode_multi_agent()
       self._logger.info(f'running one episode takes {time.time() - t} seconds!')
 
-      self._logger.info(f'step_number = {step_number}')
-      self._logger.info(f'total_reward = {total_reward}')
-      self._logger.info(f'all_cert = {all_cert}')
-      self._logger.info(f'all_reward = {all_reward}')
-      self._logger.info(f'all_action = {all_action}')
+      # self._logger.info(f'step_number = {step_number}')
+      # self._logger.info(f'total_reward = {total_reward}')
+      # self._logger.info(f'all_cert = {all_cert}')
+      # self._logger.info(f'all_reward = {all_reward}')
+      # self._logger.info(f'all_action = {all_action}')
 
       result = {
         'step_number': step_number,

@@ -36,7 +36,7 @@ STORE_FILENAME_PREFIX = circular_replay_buffer.STORE_FILENAME_PREFIX
 class FixedReplayBuffer(object):
   """Object composed of a list of OutofGraphReplayBuffers."""
 
-  def __init__(self, data_dir, replay_suffix, ckpt_chooser=None, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg
+  def __init__(self, data_dir, replay_suffix, ckpt_chooser, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg
     """Initialize the FixedReplayBuffer class.
 
     Args:
@@ -126,7 +126,7 @@ class FixedReplayBuffer(object):
   def load(self, *args, **kwargs):  # pylint: disable=unused-argument
     pass
 
-  def reload_bffer(self, num_buffers=None):
+  def reload_buffer(self, num_buffers=None):
     self._loaded_buffers = False
     self._load_replay_buffers(num_buffers)
 
